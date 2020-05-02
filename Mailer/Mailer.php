@@ -14,6 +14,8 @@ namespace FOS\UserBundle\Mailer;
 use FOS\UserBundle\Model\UserInterface;
 use Symfony\Bundle\FrameworkBundle\Templating\EngineInterface;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Twig\Environment;
 
@@ -23,7 +25,7 @@ use Twig\Environment;
 class Mailer implements MailerInterface
 {
     /**
-     * @var \Swift_Mailer
+     * @var \Symfony\Component\Mailer\Mailer
      */
     protected $mailer;
 
@@ -65,11 +67,11 @@ class Mailer implements MailerInterface
     {
         $template = $this->parameters['confirmation.template'];
         $url = $this->router->generate('fos_user_registration_confirm', array('token' => $user->getConfirmationToken()), UrlGeneratorInterface::ABSOLUTE_URL);
-        $rendered = $this->templating->render($template, array(
+        $context = [
             'user' => $user,
-            'confirmationUrl' => $url,
-        ));
-        $this->sendEmailMessage($rendered, $this->parameters['from_email']['confirmation'], (string) $user->getEmail());
+            'confirmationUrl' => $url
+        ];
+        $this->sendEmailMessage($template, $context, $this->parameters['from_email']['confirmation'], (string) $user->getEmail());
     }
 
     /**
@@ -79,30 +81,53 @@ class Mailer implements MailerInterface
     {
         $template = $this->parameters['resetting.template'];
         $url = $this->router->generate('fos_user_resetting_reset', array('token' => $user->getConfirmationToken()), UrlGeneratorInterface::ABSOLUTE_URL);
-        $rendered = $this->templating->render($template, array(
+        $context = [
             'user' => $user,
-            'confirmationUrl' => $url,
-        ));
-        $this->sendEmailMessage($rendered, $this->parameters['from_email']['resetting'], (string) $user->getEmail());
+            'confirmationUrl' => $url
+        ];
+        $this->sendEmailMessage($template, $context, $this->parameters['from_email']['resetting'], (string) $user->getEmail());
     }
 
     /**
-     * @param string       $renderedTemplate
-     * @param array|string $fromEmail
-     * @param array|string $toEmail
+     * @param string $templateName
+     * @param array  $context
+     * @param array  $fromEmail
+     * @param string $toEmail
      */
-    protected function sendEmailMessage($renderedTemplate, $fromEmail, $toEmail)
+    protected function sendEmailMessage($templateName, $context, $fromEmail, $toEmail)
     {
-        // Render the email, use the first line as the subject, and the rest as the body
-        $renderedLines = explode("\n", trim($renderedTemplate));
-        $subject = array_shift($renderedLines);
-        $body = implode("\n", $renderedLines);
+        $template = $this->templating->load($templateName);
+        $subject = $template->renderBlock('subject', $context);
+        $textBody = $template->renderBlock('body_text', $context);
 
-        $message = (new \Swift_Message())
-            ->setSubject($subject)
-            ->setFrom($fromEmail)
-            ->setTo($toEmail)
-            ->setBody($body);
+        $htmlBody = '';
+
+        if ($template->hasBlock('body_html', $context)) {
+            $htmlBody = $template->renderBlock('body_html', $context);
+        }
+
+        if(!is_array($fromEmail)) {
+            $fromEmail = [$fromEmail => ''];
+        }
+
+        if(!is_array($toEmail)) {
+            $toEmail = [$toEmail => ''];
+        }
+
+        $message = (new Email())
+            ->subject($subject)
+            ->text($textBody);
+
+        foreach ($fromEmail as $email => $name) {
+            $message->from(new Address($email, $name));
+        }
+        foreach ($toEmail as $email => $name) {
+            $message->to(new Address($email, $name));
+        }
+
+        if (!empty($htmlBody)) {
+            $message->html($htmlBody);
+        }
 
         $this->mailer->send($message);
     }
