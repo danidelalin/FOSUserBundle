@@ -30,7 +30,7 @@ class TwigSwiftMailer implements MailerInterface
     protected $router;
 
     /**
-     * @var \Twig_Environment
+     * @var \Twig\Environment
      */
     protected $twig;
 
@@ -44,10 +44,10 @@ class TwigSwiftMailer implements MailerInterface
      *
      * @param \Swift_Mailer         $mailer
      * @param UrlGeneratorInterface $router
-     * @param \Twig_Environment     $twig
+     * @param \Twig\Environment     $twig
      * @param array                 $parameters
      */
-    public function __construct(\Swift_Mailer $mailer, UrlGeneratorInterface $router, \Twig_Environment $twig, array $parameters)
+    public function __construct(\Swift_Mailer $mailer, UrlGeneratorInterface $router, \Twig\Environment $twig, array $parameters)
     {
         $this->mailer = $mailer;
         $this->router = $router;
